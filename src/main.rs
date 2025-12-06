@@ -1,10 +1,12 @@
 mod models;
 mod schema;
+mod message_store;
 
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
 use diesel::{Connection, RunQueryDsl, SqliteConnection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use crate::message_store::MessageStore;
 use crate::models::Msg;
 use crate::schema::messages::dsl;
 
@@ -20,19 +22,19 @@ fn main() -> Result<()> {
     conn.run_pending_migrations(MIGRATIONS)
         .map_err(|e| anyhow::anyhow!("Failed to run database migrations: {}", e))?;
 
+    let mut store = MessageStore::new(conn);
+
     for line in reader.lines() {
-        handle_line(&mut conn, line.map_err(|e| e.into())).unwrap_or_else(|e| println!("Error: {}", e));
+        handle_line(&mut store, line.map_err(|e| e.into())).unwrap_or_else(|e| println!("Error: {}", e));
     }
     Ok(())
 }
 
-fn handle_line(conn: &mut SqliteConnection, line: Result<String>) -> Result<()> {
+fn handle_line(store: &mut MessageStore, line: Result<String>) -> Result<()> {
     let line = line?;
     let msg: Msg = line.try_into()?;
 
-    diesel::insert_into(dsl::messages)
-        .values(&msg)
-        .execute(conn)?;
+    store.insert_message(&msg)?;
 
     println!("{msg:?}");
     Ok(())
