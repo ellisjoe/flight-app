@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Msg {
     pub message_type: String,
-    pub transmission_type: String,
+    pub transmission_type: Option<String>,
     pub session_id: String,
     pub aircraft_id: String,
     pub hex_ident: String,
@@ -46,7 +46,7 @@ impl TryFrom<String> for Msg {
 
         Ok(Self {
             message_type: values[0].into(),
-            transmission_type: values[1].into(),
+            transmission_type: parse_option(values[1])?,
             session_id: values[2].into(),
             aircraft_id: values[3].into(),
             hex_ident: values[4].into(),

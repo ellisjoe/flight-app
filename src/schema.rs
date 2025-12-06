@@ -4,7 +4,7 @@ diesel::table! {
     messages (id) {
         id -> Integer,
         message_type -> Text,
-        transmission_type -> Text,
+        transmission_type -> Nullable<Text>,
         session_id -> Text,
         aircraft_id -> Text,
         hex_ident -> Text,

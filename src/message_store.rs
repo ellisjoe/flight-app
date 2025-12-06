@@ -1,12 +1,17 @@
-use std::time::Instant;
 use anyhow::Context;
-use chrono::{Duration, Utc};
-use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper, SqliteConnection};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper, SqliteConnection};
 use crate::models::Msg;
 use crate::schema::messages::dsl;
 
 pub struct MessageStore {
     conn: SqliteConnection,
+}
+
+pub struct Query {
+    pub message_type: Option<String>,
+    pub transmission_type: Option<String>,
+    pub start_timestamp: Option<i64>,
+    pub end_timestamp: Option<i64>,
 }
 
 impl MessageStore {
@@ -21,17 +26,25 @@ impl MessageStore {
         Ok(())
     }
 
-    pub fn get_messages(&mut self, start: Option<i64>, end: Option<i64>) -> anyhow::Result<Vec<Msg>> {
-        let mut query = dsl::messages.select(Msg::as_select()).into_boxed();
+    pub fn get_messages(&mut self, query: Query) -> anyhow::Result<Vec<Msg>> {
+        let mut sql = dsl::messages.select(Msg::as_select()).into_boxed();
 
-        if let Some(start) = start {
-            query = query.filter(dsl::generated_timestamp.ge(start));
+        if let Some(message_type) = query.message_type {
+            sql = sql.filter(dsl::message_type.eq(message_type));
         }
 
-        if let Some(end) = end {
-            query = query.filter(dsl::generated_timestamp.le(end));
+        if let Some(transmission_type) = query.transmission_type {
+            sql = sql.filter(dsl::transmission_type.eq(transmission_type));
         }
 
-        query.load(&mut self.conn).context("Failed to execute query")
+        if let Some(start) = query.start_timestamp {
+            sql = sql.filter(dsl::generated_timestamp.ge(start));
+        }
+
+        if let Some(end) = query.end_timestamp {
+            sql = sql.filter(dsl::generated_timestamp.le(end));
+        }
+
+        sql.load(&mut self.conn).context("Failed to execute query")
     }
 }
