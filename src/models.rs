@@ -1,10 +1,10 @@
-use std::str::FromStr;
+use std::fmt::Display;
+use crate::errors::{Error, Result};
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use anyhow::{Context, Result};
+use std::str::FromStr;
 
-#[derive(Debug)]
-#[derive(Queryable, Selectable, Insertable)]
+#[derive(Debug, Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::messages)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Msg {
@@ -32,16 +32,16 @@ pub struct Msg {
 }
 
 impl TryFrom<String> for Msg {
-    type Error = anyhow::Error;
+    type Error = Error;
 
-    fn try_from(line: String) -> Result<Self, Self::Error> {
+    fn try_from(line: String) -> Result<Self> {
         let values = line.split(",").collect::<Vec<&str>>();
 
         if values.len() != 22 {
-            anyhow::bail!(
-                "Message must have exactly 22 elements: {}",
+            return Err(Error::InvalidArgument(format!(
+                "Message must contain exactly 22 elements: {}",
                 values.join(",")
-            );
+            )));
         }
 
         Ok(Self {
@@ -69,11 +69,17 @@ impl TryFrom<String> for Msg {
     }
 }
 
-fn parse_option<T, E>(str: &str) -> Result<Option<T>, E>
+fn parse_option<T, E>(str: &str) -> Result<Option<T>>
 where
     T: FromStr<Err = E>,
+    E: Display
 {
-    or_none(str).map(|x| x.parse()).transpose()
+    or_none(str)
+        .map(|x| {
+            x.parse()
+                .map_err(|e| Error::InvalidArgument(format!("Unable to parse value: {e}")))
+        })
+        .transpose()
 }
 
 fn or_none(str: &str) -> Option<&str> {
@@ -83,9 +89,9 @@ fn or_none(str: &str) -> Option<&str> {
 fn to_epoch_millis(date: &str, time: &str) -> Result<i64> {
     let date = format!("{} {}", date, time);
     let date_time = NaiveDateTime::parse_from_str(date.as_str(), "%Y/%m/%d %H:%M:%S%.3f")
-        .context("Failed to parse datetime")?
+        .map_err(|e| Error::InvalidArgument(format!("Unable to parse date time: {e}")))?
         .and_local_timezone(chrono::Local)
         .earliest()
-        .ok_or_else(|| anyhow::anyhow!("Unable to parse date: {}", date))?;
+        .ok_or_else(|| Error::InvalidArgument(format!("Unable to parse date: {date}")))?;
     Ok(date_time.timestamp_millis())
 }

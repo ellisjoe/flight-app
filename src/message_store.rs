@@ -1,10 +1,13 @@
-use anyhow::Context;
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper, SqliteConnection};
+use crate::errors::{Error, Result};
 use crate::models::Msg;
 use crate::schema::messages::dsl;
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper, SqliteConnection};
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 
+#[derive(Clone)]
 pub struct MessageStore {
-    conn: SqliteConnection,
+    conn: Arc<Mutex<SqliteConnection>>,
 }
 
 pub struct Query {
@@ -15,18 +18,23 @@ pub struct Query {
 }
 
 impl MessageStore {
-    pub fn new(conn: SqliteConnection) -> Self {
+    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
         Self { conn }
     }
 
-    pub fn insert_message(&mut self, msg: &Msg) -> anyhow::Result<()> {
+    pub fn insert_message(&self, msg: &Msg) -> Result<()> {
+        let mut conn = self
+            .conn
+            .lock()
+            .map_err(|e| Error::InternalError(format!("Lock poisoned: {e}")))?;
         diesel::insert_into(dsl::messages)
             .values(msg)
-            .execute(&mut self.conn)?;
+            .execute(conn.deref_mut())
+            .map_err(|e| Error::InternalError(format!("Inserting message failed: {e}")))?;
         Ok(())
     }
 
-    pub fn get_messages(&mut self, query: Query) -> anyhow::Result<Vec<Msg>> {
+    pub fn get_messages(&self, query: Query) -> Result<Vec<Msg>> {
         let mut sql = dsl::messages.select(Msg::as_select()).into_boxed();
 
         if let Some(message_type) = query.message_type {
@@ -45,6 +53,11 @@ impl MessageStore {
             sql = sql.filter(dsl::generated_timestamp.le(end));
         }
 
-        sql.load(&mut self.conn).context("Failed to execute query")
+        let mut conn = self
+            .conn
+            .lock()
+            .map_err(|e| Error::InternalError(format!("Lock poisoned: {e}")))?;
+        sql.load(conn.deref_mut())
+            .map_err(|e| Error::InternalError(format!("Failed to execute query: {e}")))
     }
 }
