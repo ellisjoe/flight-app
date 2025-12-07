@@ -10,6 +10,7 @@ use crate::models::Msg;
 use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use tower_http::cors::CorsLayer;
 use chrono::{DateTime, TimeZone, Utc};
 use diesel::{Connection, SqliteConnection};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
@@ -52,6 +53,7 @@ async fn main() -> Result<()> {
     // Server
     let app = Router::new()
         .route("/planes", post(planes_handler))
+        .layer(CorsLayer::permissive())
         .with_state(Arc::new(store.clone()));
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app)
@@ -76,6 +78,7 @@ struct Plane {
     callsign: String,
     altitude: i64,
     ground_speed: i64,
+    track: i64,
     latitude: f64,
     longitude: f64,
     vertical_rate: i64,
@@ -108,6 +111,7 @@ async fn planes_handler(
         msg.callsign.map(|x| plane.callsign = x);
         msg.altitude.map(|x| plane.altitude = x);
         msg.ground_speed.map(|x| plane.ground_speed = x);
+        msg.track.map(|x| plane.track = x);
         msg.latitude.map(|x| plane.latitude = x);
         msg.longitude.map(|x| plane.longitude = x);
         msg.vertical_rate.map(|x| plane.vertical_rate = x);
