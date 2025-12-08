@@ -10,7 +10,6 @@ use crate::models::Msg;
 use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use tower_http::cors::CorsLayer;
 use chrono::{DateTime, TimeZone, Utc};
 use diesel::{Connection, SqliteConnection};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
@@ -20,6 +19,7 @@ use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use tokio::task;
+use tower_http::cors::CorsLayer;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -118,7 +118,12 @@ async fn planes_handler(
         msg.squawk.map(|x| plane.squawk = x);
     }
 
-    Ok(Json(current.into_values().collect()))
+    Ok(Json(
+        current
+            .into_values()
+            .filter(|p| p.latitude != 0.0 && p.longitude != 0.0)
+            .collect(),
+    ))
 }
 
 fn to_date_time(timestamp: i64) -> Result<DateTime<Utc>> {
