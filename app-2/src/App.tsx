@@ -2,11 +2,21 @@ import React, { useEffect, useState } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
-import L, { Icon, LatLngExpression } from "leaflet";
+import L, { Icon, LatLngExpression, DivIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet/dist/leaflet.js";
+import planeSvg from "./plane.svg";
 
 const DENVER: LatLngExpression = [39.76, -105.08];
+
+const createPlaneIcon = (rotation: number): DivIcon => {
+  return L.divIcon({
+    html: `<img src="${planeSvg}" style="width: 30px; height: 30px; transform: rotate(${rotation}deg);" />`,
+    className: 'plane-icon',
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+};
 
 function App() {
   const [time, setTime] = useState<Date>();
@@ -59,7 +69,7 @@ function App() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {planes.map((p) => (
-            <Marker position={[p.latitude, p.longitude]}>
+            <Marker key={p.hex_ident} position={[p.latitude, p.longitude]} icon={createPlaneIcon(p.track)}>
               <Popup>
                 {p.callsign}
               </Popup>
@@ -72,18 +82,18 @@ function App() {
 }
 
 interface Plane {
-  aircraft_id: String;
-  hex_ident: String;
-  generated_timestamp: String;
-  logged_timestamp: String;
-  callsign: String;
+  aircraft_id: string;
+  hex_ident: string;
+  generated_timestamp: string;
+  logged_timestamp: string;
+  callsign: string;
   altitude: number;
   ground_speed: number;
   track: number;
   latitude: number;
   longitude: number;
   vertical_rate: number;
-  squawk: String;
+  squawk: string;
 }
 
 export default App;

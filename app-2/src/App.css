@@ -41,3 +41,8 @@
   height: 100vh; /* Example: full viewport height */
   width: 100%;   /* Example: full width */
 }
+
+.plane-icon {
+  background: none;
+  border: none;
+}
